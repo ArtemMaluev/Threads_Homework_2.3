@@ -26,9 +26,9 @@ public class Order {
             System.out.println(Thread.currentThread().getName() + " зашёл в ресторан");
             try {
                 Thread.sleep(ACTIONS_TIME);
-                restaurant.getQueueVisitor().add(Thread.currentThread().getName());
                 locker.lock();
                 System.out.println(Thread.currentThread().getName() + " готов сделать заказ");
+                restaurant.getQueueVisitor().add(Thread.currentThread().getName());
                 condition.await();
                 System.out.println(Thread.currentThread().getName() + " начал есть");
             } finally {
@@ -44,32 +44,36 @@ public class Order {
     }
 
     public void bringOrder() {
+        String str = "";
         try {
-            boolean flag = true;
             System.out.println(Thread.currentThread().getName() + " готов к работе");
-            while (flag) {
+            while (true) {
                 Thread.sleep(ACTIONS_TIME);
-                if (!restaurant.getQueueVisitor().isEmpty()) {
-                    restaurant.getQueueVisitor().remove();
-                    flag = false;
+                try {
+                    locker.lock();
+                    if (!restaurant.getQueueVisitor().isEmpty()) {
+                        str = restaurant.getQueueVisitor().element();
+                        restaurant.getQueueVisitor().remove();
+                        System.out.println(Thread.currentThread().getName() + " принял заказ у " + str);
+                        break;
+                    }
+                } finally {
+                    locker.unlock();
+                    Thread.sleep(ACTIONS_TIME);
                 }
                 if (Restaurant.counter == Main.NUMBER_VISITORS) {
+                    locker.lock();
                     return;
                 }
             }
             locker.lock();
-            Thread.sleep(ACTIONS_TIME);
-            System.out.println(Thread.currentThread().getName() + " принял заказ");
             Thread.sleep(ORDER_COMPLETION_TIME);
-            System.out.println(Thread.currentThread().getName() + " принёс заказ");
+            System.out.println(Thread.currentThread().getName() + " принёс заказ " + str);
             condition.signal();
         } catch (InterruptedException e) {
             e.printStackTrace();
         } finally {
-            try {
-                locker.unlock();  // Почему то выскакивает исключение IllegalMonitorStateException ????
-            } catch (IllegalMonitorStateException i) {
-            }
+            locker.unlock();
         }
     }
 }
